@@ -379,7 +379,7 @@ async function startBatchConversion() {
     totalPixelsInBatch = 0;
     fileContributions = {};
     isConverting = true;
-    showProgressModal(); // Modal shows "calculating total..." initially
+    showProgressModal(); 
 
     const convertBtn = document.getElementById('convertBtn');
     if (convertBtn) {
@@ -388,7 +388,6 @@ async function startBatchConversion() {
     }
 
     // --- PHASE 2: BACKGROUND PIXEL CALCULATION ---
-    // This runs without blocking the conversion loop below
     const pixelCalculationPromise = (async () => {
         for (const file of selectedFiles) {
             if (!isConverting) break;
@@ -407,10 +406,10 @@ async function startBatchConversion() {
                 };
                 img.src = URL.createObjectURL(file);
             });
-            // Yield to UI thread to keep numbers rolling smoothly
+            // Keep UI responsive while scanning
             await new Promise(r => setTimeout(r, 0));
         }
-        // Force an update once calculation is done to "unlock" the progress bar
+        // Unlock the progress bar once total is known
         if (typeof updateProgress === 'function') updateProgress(-1, 0);
     })();
 
@@ -425,12 +424,11 @@ async function startBatchConversion() {
 
         await convertSingleFile(i);
         
-        // Mobile-friendly delay
-        const isMobile = window.innerWidth < 768;
-        await new Promise(r => setTimeout(r, isMobile ? 150 : 50));
+        // standard safety delay
+        await new Promise(r => setTimeout(r, 50)); 
     }
 
-    // Wait for the background calculation to finish before closing/finalizing
+    // Wait for the background scan to finish before finalizing
     await pixelCalculationPromise;
 
     var downloadAllBtn = document.querySelector(".btn-download");
@@ -655,7 +653,7 @@ function animatePixelCounter() {
     
     let needsUpdate = false;
     
-    // Pixel counter ALWAYS moves (Phase 1 & 2)
+    // Processed pixels number ALWAYS moves immediately
     if (currentDisplayPixels < targetPixels) {
         const gap = targetPixels - currentDisplayPixels;
         const step = Math.max(1, Math.ceil(gap / 20));
@@ -663,7 +661,7 @@ function animatePixelCounter() {
         needsUpdate = true;
     }
     
-    // Progress bar ONLY moves if total is known (Phase 2)
+    // Progress bar ONLY moves once total is calculated
     if (totalPixelsInBatch > 0 && currentDisplayPercent < targetPercent) {
         const gap = targetPercent - currentDisplayPercent;
         const step = Math.max(0.1, gap / 20);
@@ -675,14 +673,14 @@ function animatePixelCounter() {
         const formattedCurrent = Math.round(currentDisplayPixels).toLocaleString();
         
         if (totalPixelsInBatch > 0) {
-            // SHOW FULL INFO: Bar moves, numbers show "x / y"
+            // PHASE 2: Calculation done - Show real total and move bar
             const formattedTotal = Math.round(totalPixelsInBatch).toLocaleString();
             progressText.textContent = `${formattedCurrent} / ${formattedTotal} pixels processed`;
             progressBar.style.width = `${currentDisplayPercent}%`;
             progressPercent.textContent = `${Math.round(currentDisplayPercent)}%`;
         } else {
-            // SHOW SCANNING INFO: Only numbers roll, bar stays 0
-            progressText.textContent = `${formattedCurrent} pixels processed (calculating total...)`;
+            // PHASE 1: Calculating - Roll numbers but hide bar/total
+            progressText.textContent = `${formattedCurrent} / calculating total... pixels processed`;
             progressBar.style.width = `0%`;
             progressPercent.textContent = `0%`;
         }
@@ -690,7 +688,7 @@ function animatePixelCounter() {
         progressBar.setAttribute('aria-valuenow', Math.round(currentDisplayPercent));
     }
     
-    // Keep animation running if numbers or bar still need to move
+    // Check if we need to keep animating
     const barNeedsToMove = totalPixelsInBatch > 0 && currentDisplayPercent < targetPercent;
     if (currentDisplayPixels < targetPixels || barNeedsToMove) {
         animationFrame = requestAnimationFrame(animatePixelCounter);
