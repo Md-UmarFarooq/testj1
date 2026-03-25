@@ -375,7 +375,6 @@ async function startBatchConversion() {
 
     if (isConverting) return;
 
-    // --- PHASE 1: START UI IMMEDIATELY ---
     totalPixelsInBatch = 0;
     fileContributions = {};
     isConverting = true;
@@ -387,7 +386,6 @@ async function startBatchConversion() {
         convertBtn.textContent = 'Processing...';
     }
 
-    // --- PHASE 2: BACKGROUND PIXEL CALCULATION ---
     const pixelCalculationPromise = (async () => {
         for (const file of selectedFiles) {
             if (!isConverting) break;
@@ -406,14 +404,11 @@ async function startBatchConversion() {
                 };
                 img.src = URL.createObjectURL(file);
             });
-            // Keep UI responsive while scanning
             await new Promise(r => setTimeout(r, 0));
         }
-        // Unlock the progress bar once total is known
-        if (typeof updateProgress === 'function') updateProgress(-1, 0);
+        // ✅ REMOVED: updateProgress(-1, 0) - No more data pollution!
     })();
 
-    // --- PHASE 3: CONVERSION LOOP ---
     for (let i = 0; i < selectedFiles.length; i++) {
         if (!isConverting) break; 
 
@@ -423,21 +418,15 @@ async function startBatchConversion() {
         }
 
         await convertSingleFile(i);
-        
-        // standard safety delay
         await new Promise(r => setTimeout(r, 50)); 
     }
 
-    // Wait for the background scan to finish before finalizing
     await pixelCalculationPromise;
 
     var downloadAllBtn = document.querySelector(".btn-download");
     if (downloadAllBtn) {
         downloadAllBtn.style.display = "block";
-        downloadAllBtn.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'end' 
-        });
+        downloadAllBtn.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
     finalizeConversion();
 }
@@ -653,7 +642,6 @@ function animatePixelCounter() {
     
     let needsUpdate = false;
     
-    // Processed pixels number ALWAYS moves immediately
     if (currentDisplayPixels < targetPixels) {
         const gap = targetPixels - currentDisplayPixels;
         const step = Math.max(1, Math.ceil(gap / 20));
@@ -661,7 +649,6 @@ function animatePixelCounter() {
         needsUpdate = true;
     }
     
-    // Progress bar ONLY moves once total is calculated
     if (totalPixelsInBatch > 0 && currentDisplayPercent < targetPercent) {
         const gap = targetPercent - currentDisplayPercent;
         const step = Math.max(0.1, gap / 20);
@@ -673,13 +660,11 @@ function animatePixelCounter() {
         const formattedCurrent = Math.round(currentDisplayPixels).toLocaleString();
         
         if (totalPixelsInBatch > 0) {
-            // PHASE 2: Calculation done - Show real total and move bar
             const formattedTotal = Math.round(totalPixelsInBatch).toLocaleString();
             progressText.textContent = `${formattedCurrent} / ${formattedTotal} pixels processed`;
             progressBar.style.width = `${currentDisplayPercent}%`;
             progressPercent.textContent = `${Math.round(currentDisplayPercent)}%`;
         } else {
-            // PHASE 1: Calculating - Roll numbers but hide bar/total
             progressText.textContent = `${formattedCurrent} / calculating total... pixels processed`;
             progressBar.style.width = `0%`;
             progressPercent.textContent = `0%`;
@@ -688,7 +673,6 @@ function animatePixelCounter() {
         progressBar.setAttribute('aria-valuenow', Math.round(currentDisplayPercent));
     }
     
-    // Check if we need to keep animating
     const barNeedsToMove = totalPixelsInBatch > 0 && currentDisplayPercent < targetPercent;
     if (currentDisplayPixels < targetPixels || barNeedsToMove) {
         animationFrame = requestAnimationFrame(animatePixelCounter);
@@ -934,8 +918,6 @@ function showProgressModal() {
     if (progressModal) {
         progressModal.style.display = 'flex';
         
-        // Reset progress
-        // Reset everything
         currentDisplayPixels = 0;
         targetPixels = 0;
         currentDisplayPercent = 0;
@@ -954,8 +936,8 @@ function showProgressModal() {
         
         const progressText = document.getElementById('progressText');
         if (progressText) {
-            const formattedTotal = Math.round(totalPixelsInBatch).toLocaleString();
-            progressText.textContent = `0 / ${formattedTotal} pixels processed`;
+            // ✅ FIX: Initial state matches the Phase 1 logic
+            progressText.textContent = `0 / calculating total... pixels processed`;
         }
         
         const progressPercent = document.getElementById('progressPercent');
@@ -970,7 +952,6 @@ function showProgressModal() {
         const remainingCount = document.getElementById('remainingCount');
         if (remainingCount) remainingCount.textContent = selectedFiles.length.toString();
         
-        // Show cancel button, hide download button
         const cancelBtn = document.getElementById('cancelBtn');
         if (cancelBtn) cancelBtn.style.display = 'block';
         
